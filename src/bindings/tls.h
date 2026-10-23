@@ -23,6 +23,13 @@
 #include <winhttp.h>
 
 #pragma comment(lib, "winhttp.lib")
+#elif defined(NX8V_USE_OPENSSL)
+#include <openssl/err.h>
+#include <openssl/ssl.h>
+#include <netdb.h>
+#include <sys/socket.h>
+#include <unistd.h>
+#include <vector>
 #endif
 
 namespace nx8v {
@@ -78,7 +85,7 @@ static void HttpsRun(HttpsJob* job) {
   };
 
   do {
-    session = WinHttpOpen(L"nx8v/0.1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+    session = WinHttpOpen(L"nx8v/0.2", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                           WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
     if (!session) { fail("WinHttpOpen"); break; }
 
@@ -228,15 +235,6 @@ static void HttpsRun(HttpsJob* job) {
 }
 
 #elif defined(NX8V_USE_OPENSSL)
-
-#include <openssl/err.h>
-#include <openssl/ssl.h>
-
-#include <cstring>
-#include <netdb.h>
-#include <sys/socket.h>
-#include <unistd.h>
-#include <vector>
 
 static void HttpsRun(HttpsJob* job) {
   SSL_library_init();

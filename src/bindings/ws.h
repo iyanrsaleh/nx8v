@@ -480,7 +480,7 @@ static void WsWssSignal(WsClientConn* c) { uv_async_send(&c->async); }
 
 static void WsWssThread(void* arg) {
   auto* c = static_cast<WsClientConn*>(arg);
-  HINTERNET session = WinHttpOpen(L"nx8v/0.1", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
+  HINTERNET session = WinHttpOpen(L"nx8v/0.2", WINHTTP_ACCESS_TYPE_AUTOMATIC_PROXY,
                                   WINHTTP_NO_PROXY_NAME, WINHTTP_NO_PROXY_BYPASS, 0);
   HINTERNET connect = nullptr;
   HINTERNET request = nullptr;

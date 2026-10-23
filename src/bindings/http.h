@@ -77,6 +77,13 @@ struct HttpServer {
   bool                     closing   = false;
   v8::Global<v8::Function> request_listener;  // default request listener (if any)
   v8::Isolate*             isolate   = nullptr;
+  // TLS material for https.createServer. tls_state is owned here.
+  bool                     tls = false;
+  std::string              tls_cert;
+  std::string              tls_key;
+  std::string              tls_pfx;
+  std::string              tls_pass;
+  void*                    tls_state = nullptr;
 };
 
 // Per-connection state.
@@ -110,7 +117,45 @@ struct HttpConn {
 
   // Owning server (back-pointer; handle.data points to this conn).
   HttpServer*              server = nullptr;
+
+  // TLS + HTTP/2. sec is owned here and freed when the connection is deleted.
+  bool                     use_tls = false;
+  bool                     tls_ready = false;
+  bool                     alpn_h2 = false;
+  bool                     h2 = false;
+  bool                     h2_replied = false;
+  bool                     h2_settings_sent = false;
+  int                      h2_stream = 0;
+  std::string              h2_in;
+  std::string              h2_block;
+  std::string              h2_body;
+  std::string              h2_method;
+  std::string              h2_path;
+  std::string              h2_authority;
+  std::map<std::string, std::string> h2_headers;
+  void*                    sec = nullptr;
+  ~HttpConn();
 };
+
+static void Nx8vSecFree(void* sec);
+static void Nx8vH2Forget(HttpConn* conn);
+inline HttpConn::~HttpConn() {
+  Nx8vH2Forget(this);
+  Nx8vSecFree(sec);
+  sec = nullptr;
+}
+
+static void Nx8vH2Reply(HttpConn* conn, int status,
+                        const std::map<std::string, std::string>& headers,
+                        const std::string& body);
+static std::string Nx8vTlsSeal(HttpConn* conn, const std::string& plain);
+static bool Nx8vTlsPrepare(HttpServer* srv, std::string* err);
+static void Nx8vTlsFree(HttpServer* srv);
+static bool Nx8vTlsConsume(HttpConn* conn, const char* data, size_t n);
+static void Nx8vH2Feed(HttpConn* conn, const std::string& chunk);
+static bool Nx8vTakeH2(HttpConn* conn);
+static void HttpWriteRaw(HttpConn* conn, const std::string& data,
+                         bool shutdown_after = false);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -361,6 +406,11 @@ static void Nx8vCommitResponse(HttpConn* conn, ResState* st, std::string body) {
       else body.insert(at, kScript);
   }
   st->headers["Content-Length"] = std::to_string(body.size());
+  if (conn->h2) {
+    conn->headers_sent = true;
+    Nx8vH2Reply(conn, st->status_code, st->headers, body);
+    return;
+  }
   st->headers["Connection"] = conn->keep_alive ? "keep-alive" : "close";
 
   std::string head = "HTTP/1.1 " + std::to_string(st->status_code) + " " +
@@ -372,6 +422,10 @@ static void Nx8vCommitResponse(HttpConn* conn, ResState* st, std::string body) {
 
   std::string full = head + body;
   conn->headers_sent = true;
+  if (conn->tls_ready) {
+    HttpWriteRaw(conn, full, !conn->keep_alive);
+    return;
+  }
 
   auto* buf = new char[full.size()];
   memcpy(buf, full.data(), full.size());
@@ -538,12 +592,25 @@ static std::string WsAcceptKey(const std::string& client_key) {
 struct WsWriteReq {
   uv_write_t req;
   char*      data = nullptr;
+  HttpConn*  conn = nullptr;
+  bool       shutdown_after = false;
 };
 
 static void WsWriteDone(uv_write_t* req, int) {
   auto* w = reinterpret_cast<WsWriteReq*>(req);
+  HttpConn* c = w->conn;
+  bool shut = w->shutdown_after;
   delete[] w->data;
   delete w;
+  if (!shut || !c) return;
+  c->shutdown_req.data = c;
+  uv_shutdown(&c->shutdown_req, (uv_stream_t*)&c->handle,
+              [](uv_shutdown_t* sreq, int) {
+                auto* c2 = static_cast<HttpConn*>(sreq->data);
+                uv_close((uv_handle_t*)&c2->handle, [](uv_handle_t* h) {
+                  delete reinterpret_cast<HttpConn*>(h->data);
+                });
+              });
 }
 
 // Queue one frame (server frames are never masked).
@@ -563,13 +630,7 @@ static void WsSendFrame(HttpConn* conn, uint8_t opcode, const std::string& paylo
     for (int i = 7; i >= 0; --i) frame += (char)((len >> (8 * i)) & 0xFF);
   }
   frame += payload;
-
-  auto* w = new WsWriteReq();
-  w->data = new char[frame.size()];
-  std::memcpy(w->data, frame.data(), frame.size());
-  uv_buf_t buf = uv_buf_init(w->data, (unsigned int)frame.size());
-  w->req.data = conn;
-  uv_write(&w->req, (uv_stream_t*)&conn->handle, &buf, 1, WsWriteDone);
+  HttpWriteRaw(conn, frame, false);
 }
 
 // ws.send(text)
@@ -718,12 +779,15 @@ static void WsProcessFrames(HttpConn* conn) {
 }
 
 // Write raw bytes on the connection (used for the 101 handshake).
-static void HttpWriteRaw(HttpConn* conn, const std::string& data) {
+static void HttpWriteRaw(HttpConn* conn, const std::string& data, bool shutdown_after) {
+  std::string out = conn->tls_ready ? Nx8vTlsSeal(conn, data) : data;
+  if (out.empty() && !data.empty()) return;
   auto* w = new WsWriteReq();
-  w->data = new char[data.size()];
-  std::memcpy(w->data, data.data(), data.size());
-  uv_buf_t buf = uv_buf_init(w->data, (unsigned int)data.size());
-  w->req.data = conn;
+  w->conn = conn;
+  w->shutdown_after = shutdown_after;
+  w->data = new char[out.size()];
+  std::memcpy(w->data, out.data(), out.size());
+  uv_buf_t buf = uv_buf_init(w->data, (unsigned int)out.size());
   uv_write(&w->req, (uv_stream_t*)&conn->handle, &buf, 1, WsWriteDone);
 }
 
@@ -807,6 +871,11 @@ static void Nx8vDevArmWatch(uv_loop_t* loop) {
 }
 
 static void Nx8vSendAndClose(HttpConn* conn, const std::string& full) {
+  if (conn->tls_ready) {
+    conn->keep_alive = false;
+    HttpWriteRaw(conn, full, true);
+    return;
+  }
   auto* buf = new char[full.size()];
   std::memcpy(buf, full.data(), full.size());
   conn->write_buf = std::make_shared<uv_buf_t>();
@@ -1253,7 +1322,13 @@ static void OnConnRead(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) 
   }
   if (nread == 0 || conn->dev_waiting || conn->dev_replying) return;
 
-  conn->read_buf.append(buf->base, (size_t)nread);
+  if (conn->use_tls) {
+    if (!Nx8vTlsConsume(conn, buf->base, (size_t)nread)) return;
+  } else {
+    conn->read_buf.append(buf->base, (size_t)nread);
+  }
+
+  if (Nx8vTakeH2(conn)) return;
 
   // WebSocket connections: every byte after the handshake is a frame.
   if (conn->ws_mode) {
@@ -1278,6 +1353,7 @@ static void OnConnection(uv_stream_t* server, int status) {
   uv_tcp_init(nx8v::g_runtime->loop, &conn->handle);
   conn->handle.data = conn;  // stream->data points to the HttpConn
   conn->server = srv;
+  conn->use_tls = srv->tls;
 
   if (uv_accept(server, (uv_stream_t*)&conn->handle) == 0) {
     srv->conn_count.fetch_add(1, std::memory_order_relaxed);
@@ -1297,6 +1373,16 @@ static void ServerListen(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
   auto* srv = HttpServerFromObject(args.This());
+
+  if (srv->tls && !srv->tls_state) {
+    std::string err;
+    if (!Nx8vTlsPrepare(srv, &err)) {
+      isolate->ThrowException(v8::Exception::Error(
+          v8::String::NewFromUtf8(isolate, err.c_str(),
+                                  v8::NewStringType::kNormal).ToLocalChecked()));
+      return;
+    }
+  }
 
   int port = 0;
   std::string host = "0.0.0.0";
@@ -1382,6 +1468,7 @@ static void ServerClose(const v8::FunctionCallbackInfo<v8::Value>& args) {
                   v8::String::NewFromUtf8Literal(iso, "close") };
                 Nx8vCallIgnore(emit.As<v8::Function>(), ctx, js, 1, close_args);
               }
+             Nx8vTlsFree(s);
              delete s;
            });
 
@@ -2301,4 +2388,59 @@ inline v8::Local<v8::Object> MakeHttpModule(v8::Isolate* isolate) {
   return hs.Escape(obj);
 }
 
+static std::string Nx8vOptBytes(v8::Isolate* isolate, v8::Local<v8::Value> v) {
+  if (v.IsEmpty() || v->IsUndefined() || v->IsNull()) return "";
+  if (v->IsString()) {
+    v8::String::Utf8Value s(isolate, v);
+    return *s ? std::string(*s, s.length()) : "";
+  }
+  bool ok = false;
+  return HttpChunkBytes(isolate, v, &ok);
+}
+
+static void HttpsCreateServer(const v8::FunctionCallbackInfo<v8::Value>& args) {
+  v8::Isolate* isolate = args.GetIsolate();
+  v8::HandleScope hs(isolate);
+  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+  if (args.Length() < 1 || !args[0]->IsObject() || args[0]->IsFunction()) {
+    isolate->ThrowException(v8::Exception::TypeError(
+        v8::String::NewFromUtf8Literal(
+            isolate, "https.createServer membutuhkan { pfx, passphrase } atau { cert, key }")));
+    return;
+  }
+  auto opts = args[0].As<v8::Object>();
+  v8::Local<v8::Function> listener;
+  if (args.Length() >= 2 && args[1]->IsFunction()) listener = args[1].As<v8::Function>();
+  auto get = [&](const char* k) {
+    return opts->Get(ctx, v8::String::NewFromUtf8(isolate, k, v8::NewStringType::kNormal,
+                                                   (int)std::strlen(k)).ToLocalChecked())
+        .ToLocalChecked();
+  };
+  auto obj = MakeServer(isolate, listener);
+  auto* srv = HttpServerFromObject(obj);
+  srv->tls = true;
+  srv->tls_pfx = Nx8vOptBytes(isolate, get("pfx"));
+  srv->tls_pass = Nx8vOptBytes(isolate, get("passphrase"));
+  srv->tls_cert = Nx8vOptBytes(isolate, get("cert"));
+  srv->tls_key = Nx8vOptBytes(isolate, get("key"));
+  if (srv->tls_pfx.empty() && (srv->tls_cert.empty() || srv->tls_key.empty())) {
+    isolate->ThrowException(v8::Exception::TypeError(
+        v8::String::NewFromUtf8Literal(
+            isolate, "https.createServer membutuhkan pfx atau cert dan key")));
+    return;
+  }
+  args.GetReturnValue().Set(obj);
+}
+
+inline v8::Local<v8::Object> MakeHttpsModule(v8::Isolate* isolate) {
+  v8::EscapableHandleScope hs(isolate);
+  v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
+  auto obj = MakeHttpModule(isolate);
+  obj->Set(ctx, v8::String::NewFromUtf8Literal(isolate, "createServer"),
+           v8::Function::New(ctx, HttpsCreateServer).ToLocalChecked()).Check();
+  return hs.Escape(obj);
+}
+
 }} // nx8v::bindings
+
+#include "http2tls.h"

@@ -63,7 +63,7 @@ static v8::Local<v8::Value> LoadBuiltin(v8::Isolate* isolate,
     return hs.Escape(nx8v::bindings::MakeHttpModule(isolate));
   }
   if (name == "https") {
-    return hs.Escape(nx8v::bindings::MakeHttpModule(isolate));
+    return hs.Escape(nx8v::bindings::MakeHttpsModule(isolate));
   }
   if (name == "buffer") {
     return hs.Escape(nx8v::bindings::MakeBufferModule(isolate));

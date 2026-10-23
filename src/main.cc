@@ -227,7 +227,7 @@ int main(int argc, char* argv[]) {
       // rc == -1 → fall through, argv[1] now points to the project script
     }
     if (arg1 == "--version" || arg1 == "-v") {
-      std::puts("nx8v/0.1.0");
+      std::puts("nx8v/0.2.0");
       return 0;
     }
     if (arg1 == "--help" || arg1 == "-h") {
