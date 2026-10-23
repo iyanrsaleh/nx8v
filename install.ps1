@@ -47,8 +47,19 @@ if ($local) {
   }
 } else {
   $zip = Join-Path $env:TEMP "nx8v-win-x64.zip"
+  $sums = Join-Path $env:TEMP "nx8v-SHA256SUMS"
   $unpack = Join-Path $env:TEMP "nx8v-win-x64"
+  Invoke-WebRequest "$release/SHA256SUMS" -OutFile $sums
   Invoke-WebRequest "$release/nx8v-win-x64.zip" -OutFile $zip
+  $want = $null
+  foreach ($line in Get-Content $sums) {
+    if ($line -match '^(?<h>[0-9a-fA-F]{64})\s+\*?nx8v-win-x64\.zip\s*$') {
+      $want = $Matches.h.ToLower()
+    }
+  }
+  if (-not $want) { Write-Error "SHA256SUMS has no entry for nx8v-win-x64.zip"; exit 1 }
+  $got = (Get-FileHash $zip -Algorithm SHA256).Hash.ToLower()
+  if ($got -ne $want) { Write-Error "nx8v-win-x64.zip hash does not match the release"; exit 1 }
   if (Test-Path $unpack) { Remove-Item $unpack -Recurse -Force }
   Expand-Archive $zip -DestinationPath $unpack -Force
   $exe = Get-ChildItem $unpack -Filter nx8v.exe -Recurse | Select-Object -First 1

@@ -580,6 +580,11 @@ static void WsClientStartWss(WsClientConn* c) {
 // ws.connect(url[, cb]) -> WebSocket object
 static void WsConnect(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_net) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "network access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 

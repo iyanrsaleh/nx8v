@@ -142,6 +142,23 @@ int main(int argc, char* argv[]) {
   packed = nx8v::bindings::Nx8vPreparePackedApp();
 #endif
 
+  bool restrict_perm = false;
+  bool allow_fs = false;
+  bool allow_net = false;
+  {
+    std::vector<char*> kept;
+    kept.push_back(argv[0]);
+    for (int i = 1; i < argc; ++i) {
+      std::string a = argv[i];
+      if (a == "--allow-fs") { restrict_perm = true; allow_fs = true; continue; }
+      if (a == "--allow-net") { restrict_perm = true; allow_net = true; continue; }
+      if (a == "--fuzz") return nx8v::bindings::Nx8vRunParserFuzz();
+      kept.push_back(argv[i]);
+    }
+    for (size_t i = 0; i < kept.size(); ++i) argv[i] = kept[i];
+    argc = (int)kept.size();
+  }
+
   // A packaged app is either packed inside the exe, or the runtime exe
   // sitting next to project.json. Double-clicking it opens the desktop window.
   if (argc < 2) {
@@ -227,7 +244,7 @@ int main(int argc, char* argv[]) {
       // rc == -1 → fall through, argv[1] now points to the project script
     }
     if (arg1 == "--version" || arg1 == "-v") {
-      std::puts("nx8v/0.2.1");
+      std::puts("nx8v/0.2.2");
       return 0;
     }
     if (arg1 == "--help" || arg1 == "-h") {
@@ -249,9 +266,11 @@ int main(int argc, char* argv[]) {
         "  nx8v logs [--lines=N] tail this project's nx8v.log\n"
         "  nx8v test [path]      run tests (*.test.js)\n"
         "  nx8v package          build the distribution folder (dist/)\n"
-        "  nx8v window [file]    desktop window (WebView2) for the project\n"
+        "  nx8v window [file]    desktop window for the project\n"
         "  nx8v run <script.js>  run a script (explicit)\n"
         "  nx8v <script.js>      run a script file\n"
+        "  nx8v --allow-fs       keep file access when a permission flag is set\n"
+        "  nx8v --allow-net      keep network access when a permission flag is set\n"
         "  nx8v --version        print the version\n"
         "  nx8v --help           print this help");
       return 0;
@@ -269,6 +288,7 @@ int main(int argc, char* argv[]) {
           cli_w, cli_h, cli_show, cli_max, cli_min_w, cli_min_h, cli_pos,
           cli_center, cli_frame, cli_resize, cli_single);
     }
+    if (argc < 2) window_opts.devtools = false;
     if (window_opts.single_instance) {
       fs::path dir = fs::absolute(fs::current_path(ec), ec).lexically_normal();
       if (!nx8v::bindings::Nx8vTakeWindowInstance(dir.wstring())) {
@@ -302,6 +322,8 @@ int main(int argc, char* argv[]) {
   runtime_inst.argc    = argc;
   runtime_inst.argv    = argv;
   runtime_inst.loop    = &loop;
+  runtime_inst.allow_fs  = restrict_perm ? allow_fs : true;
+  runtime_inst.allow_net = restrict_perm ? allow_net : true;
   nx8v::g_runtime      = &runtime_inst;
 
   int exit_code = 0;

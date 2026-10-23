@@ -77,7 +77,14 @@ fi
 tmp=""
 if [ -z "${SRC}" ]; then
   tmp=$(mktemp -d)
+  curl -fsSL "https://github.com/iyanrsaleh/nx8v/releases/latest/download/SHA256SUMS" -o "${tmp}/SHA256SUMS"
   curl -fsSL "https://github.com/iyanrsaleh/nx8v/releases/latest/download/nx8v-linux-x64.tar.gz" -o "${tmp}/nx8v.tar.gz"
+  want=$(awk '$2 == "nx8v-linux-x64.tar.gz" || $2 == "*nx8v-linux-x64.tar.gz" { print $1 }' "${tmp}/SHA256SUMS")
+  got=$(sha256sum "${tmp}/nx8v.tar.gz" | awk '{ print $1 }')
+  if [ -z "${want}" ] || [ "${got}" != "${want}" ]; then
+    echo "nx8v-linux-x64.tar.gz hash does not match the release." >&2
+    exit 1
+  fi
   tar -xzf "${tmp}/nx8v.tar.gz" -C "${tmp}"
   SRC=$(find "${tmp}" -type f -name nx8v | head -n 1)
   if [ -z "${SRC}" ]; then
@@ -88,6 +95,12 @@ fi
 
 mkdir -p "${BIN_DIR}"
 install -m 755 "${SRC}" "${BIN_DIR}/nx8v"
+if [ -n "${tmp}" ]; then
+  so=$(find "${tmp}" -type f -name libnx8v-window.so | head -n 1)
+  if [ -n "${so}" ]; then
+    install -m 755 "${so}" "${BIN_DIR}/libnx8v-window.so"
+  fi
+fi
 echo "installed ${BIN_DIR}/nx8v"
 if [ -n "${tmp}" ]; then
   rm -rf "${tmp}"

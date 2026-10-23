@@ -26,6 +26,8 @@
 #elif defined(NX8V_USE_OPENSSL)
 #include <openssl/err.h>
 #include <openssl/ssl.h>
+#include <openssl/x509v3.h>
+#include <arpa/inet.h>
 #include <netdb.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -281,8 +283,30 @@ static void HttpsRun(HttpsJob* job) {
   SSL* ssl = SSL_new(ctx);
   SSL_set_fd(ssl, fd);
   SSL_set_tlsext_host_name(ssl, job->host.c_str());
+  if (job->reject_unauthorized) {
+    unsigned char ipbuf[16];
+    bool ip = inet_pton(AF_INET, job->host.c_str(), ipbuf) == 1 ||
+              inet_pton(AF_INET6, job->host.c_str(), ipbuf) == 1;
+    int host_ok = 0;
+    if (ip) {
+      host_ok = X509_VERIFY_PARAM_set1_ip_asc(SSL_get0_param(ssl), job->host.c_str());
+    } else {
+      host_ok = SSL_set1_host(ssl, job->host.c_str());
+    }
+    if (!host_ok) {
+      job->error = "certificate host check failed";
+      SSL_free(ssl);
+      SSL_CTX_free(ctx);
+      ::close(fd);
+      return;
+    }
+  }
   if (SSL_connect(ssl) != 1) {
-    job->error = "TLS handshake failed";
+    long vr = SSL_get_verify_result(ssl);
+    if (vr == X509_V_ERR_HOSTNAME_MISMATCH || vr == X509_V_ERR_IP_ADDRESS_MISMATCH)
+      job->error = "certificate name does not match the host";
+    else
+      job->error = "TLS handshake failed";
     SSL_free(ssl);
     SSL_CTX_free(ctx);
     ::close(fd);

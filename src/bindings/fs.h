@@ -80,6 +80,11 @@ static std::string UvErrStr(int status) {
 
 static void ReadFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   if (args.Length() < 1) {
     isolate->ThrowException(v8::Exception::TypeError(
@@ -111,6 +116,11 @@ static void ReadFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void WriteFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   if (args.Length() < 2) {
     isolate->ThrowException(v8::Exception::TypeError(
@@ -131,6 +141,11 @@ static void WriteFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void ExistsSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   if (args.Length() < 1) { args.GetReturnValue().Set(false); return; }
   std::string path = ToStdString(isolate, args[0]);
@@ -140,6 +155,11 @@ static void ExistsSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void MkdirSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   if (args.Length() < 1) return;
   std::string path = ToStdString(isolate, args[0]);
@@ -153,6 +173,11 @@ static void MkdirSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void UnlinkSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   if (args.Length() < 1) return;
   std::string path = ToStdString(isolate, args[0]);
@@ -166,6 +191,11 @@ static void UnlinkSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void ReaddirSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
   if (args.Length() < 1) {
@@ -196,6 +226,11 @@ static void ReaddirSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void StatSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
   if (args.Length() < 1) return;
@@ -327,6 +362,11 @@ static void OnOpen(uv_fs_t* req) {
 
 static void ReadFileAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
 
   if (args.Length() < 2 || !args[1]->IsFunction()) {
@@ -412,6 +452,11 @@ static void OnWriteOpen(uv_fs_t* req) {
 
 static void WriteFileAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
 
   if (args.Length() < 3 || !args[2]->IsFunction()) {
@@ -508,6 +553,11 @@ static void FsQueue(v8::Isolate* isolate, v8::Local<v8::Function> cb, FsJob* j) 
 
 static void RenameSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 2) return;
   std::error_code ec;
   fs::rename(ToStdString(isolate, args[0]), ToStdString(isolate, args[1]), ec);
@@ -516,6 +566,11 @@ static void RenameSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void RenameAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 3 || !args[2]->IsFunction()) {
     isolate->ThrowException(v8::Exception::TypeError(
         v8::String::NewFromUtf8Literal(isolate, "rename(from, to, cb)")));
@@ -530,6 +585,11 @@ static void RenameAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void CopyFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 2) return;
   std::error_code ec;
   fs::copy_file(ToStdString(isolate, args[0]), ToStdString(isolate, args[1]),
@@ -539,6 +599,11 @@ static void CopyFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void CopyFileAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 3 || !args[2]->IsFunction()) {
     isolate->ThrowException(v8::Exception::TypeError(
         v8::String::NewFromUtf8Literal(isolate, "copyFile(src, dest, cb)")));
@@ -553,6 +618,11 @@ static void CopyFileAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void AppendFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 2) return;
   std::string path = ToStdString(isolate, args[0]);
   std::string data = FsArgData(isolate, args[1]);
@@ -566,6 +636,11 @@ static void AppendFileSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void AppendFileAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 3 || !args[2]->IsFunction()) {
     isolate->ThrowException(v8::Exception::TypeError(
         v8::String::NewFromUtf8Literal(isolate, "appendFile(path, data, cb)")));
@@ -595,6 +670,11 @@ static void RmReadOpts(v8::Isolate* isolate, v8::Local<v8::Value> v,
 
 static void RmSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 1) return;
   bool recursive = false, force = false;
   if (args.Length() >= 2) RmReadOpts(isolate, args[1], recursive, force);
@@ -608,6 +688,11 @@ static void RmSync(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void RmAsync(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   if (args.Length() < 2) {
     isolate->ThrowException(v8::Exception::TypeError(
         v8::String::NewFromUtf8Literal(isolate, "rm(path, [opts,] cb)")));
@@ -674,6 +759,11 @@ static void WatchClose(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void Watch(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_fs) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "file system access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   auto ctx = isolate->GetCurrentContext();
   if (args.Length() < 2 || !args[1]->IsFunction()) {

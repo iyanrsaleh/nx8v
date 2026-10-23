@@ -13,7 +13,7 @@
 //   nx8v.minimize() / maximize() / close()
 //   nx8v.openDevTools()
 //
-// Windows-only.
+// Windows uses WebView2. Linux uses GTK and WebKitGTK.
 
 #include <uv.h>
 #include "loop.h"
@@ -1807,13 +1807,39 @@ inline int RunWindow(const std::string& url, const std::string& title,
 
 #else
 
+#include <dlfcn.h>
+
 namespace nx8v {
 namespace bindings {
-inline int RunWindow(const std::string&, const std::string&, int, int, uv_loop_t*,
-                     const Nx8vWindowOpts& = {}) {
-  std::fprintf(stderr, "nx8v window is supported on Windows only\n");
-  return 1;
+
+inline int RunWindow(const std::string& url, const std::string& title,
+                     int width, int height, uv_loop_t* loop,
+                     const Nx8vWindowOpts& opts = {}) {
+  std::string so = "libnx8v-window.so";
+  std::error_code ec;
+  std::filesystem::path self = std::filesystem::canonical("/proc/self/exe", ec);
+  if (!ec) so = (self.parent_path() / "libnx8v-window.so").string();
+  void* lib = dlopen(so.c_str(), RTLD_NOW | RTLD_LOCAL);
+  if (!lib) lib = dlopen("libnx8v-window.so", RTLD_NOW | RTLD_LOCAL);
+  if (!lib) {
+    std::fprintf(stderr, "nx8v window: WebKitGTK is not available (%s)\n", dlerror());
+    return 1;
+  }
+  using Fn = int (*)(const char*, const char*, int, int, uv_loop_t*,
+                     int, int, int, int, int, int, int, int, int, int, int,
+                     const char*);
+  auto fn = reinterpret_cast<Fn>(dlsym(lib, "nx8v_gtk_run_window"));
+  if (!fn) {
+    std::fprintf(stderr, "nx8v window: WebKitGTK is not available\n");
+    return 1;
+  }
+  return fn(url.c_str(), title.c_str(), width, height, loop,
+            opts.x, opts.y, opts.min_w, opts.min_h, opts.show,
+            opts.has_pos ? 1 : 0, opts.center ? 1 : 0, opts.frameless ? 1 : 0,
+            opts.resizable ? 1 : 0, opts.single_instance ? 1 : 0,
+            opts.devtools ? 1 : 0, opts.icon.c_str());
 }
-}} // nx8v::bindings
+
+}}  // nx8v::bindings
 
 #endif

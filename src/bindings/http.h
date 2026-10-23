@@ -33,6 +33,8 @@
 #include <uv.h>
 #ifdef _WIN32
 #include <windows.h>
+#else
+#include <unistd.h>
 #endif
 
 #include <algorithm>
@@ -191,6 +193,7 @@ static bool HttpParseRequest(const std::string& raw,
                              std::string& version,
                              std::map<std::string, std::string>& headers,
                              std::string& body) {
+  if (raw.size() > 1024 * 1024) return false;
   size_t header_end = raw.find("\r\n\r\n");
   if (header_end == std::string::npos) header_end = raw.find("\n\n");
   if (header_end == std::string::npos) return false;
@@ -747,7 +750,15 @@ static void WsProcessFrames(HttpConn* conn) {
       for (int i = 0; i < 4; ++i) mask[i] = (uint8_t)buf[offset + i];
       offset += 4;
     }
-    if (buf.size() < offset + len) return;  // wait for the rest
+    if (len > (8ull * 1024 * 1024)) {
+      if (!uv_is_closing((uv_handle_t*)&conn->handle)) {
+        uv_close((uv_handle_t*)&conn->handle, [](uv_handle_t* h) {
+          delete reinterpret_cast<HttpConn*>(h->data);
+        });
+      }
+      return;
+    }
+    if (offset > buf.size() || len > buf.size() - offset) return;
 
     std::string payload = buf.substr(offset, (size_t)len);
     if (masked) {
@@ -1327,6 +1338,13 @@ static void OnConnRead(uv_stream_t* stream, ssize_t nread, const uv_buf_t* buf) 
   } else {
     conn->read_buf.append(buf->base, (size_t)nread);
   }
+  if (conn->read_buf.size() > (8u * 1024u * 1024u + 64u)) {
+    if (!uv_is_closing((uv_handle_t*)&conn->handle)) {
+      uv_close((uv_handle_t*)&conn->handle,
+               [](uv_handle_t* h) { delete reinterpret_cast<HttpConn*>(h->data); });
+    }
+    return;
+  }
 
   if (Nx8vTakeH2(conn)) return;
 
@@ -1369,6 +1387,11 @@ static void OnConnection(uv_stream_t* server, int status) {
 // ---------------------------------------------------------------------------
 static void ServerListen(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_net) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "network access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
@@ -1406,15 +1429,17 @@ static void ServerListen(const v8::FunctionCallbackInfo<v8::Value>& args) {
     return;
   }
   r = uv_tcp_bind(&srv->handle, (const sockaddr*)&addr, 0);
-#ifdef _WIN32
   // A window relaunch starts while the previous process still holds the port.
   if (r == UV_EADDRINUSE && std::getenv("NX8V_WINDOW_RELAUNCH")) {
     for (int i = 0; i < 40 && r == UV_EADDRINUSE; ++i) {
+#ifdef _WIN32
       Sleep(50);
+#else
+      usleep(50 * 1000);
+#endif
       r = uv_tcp_bind(&srv->handle, (const sockaddr*)&addr, 0);
     }
   }
-#endif
   if (r != 0) {
     isolate->ThrowException(v8::Exception::Error(
       v8::String::NewFromUtf8(isolate, uv_strerror(r),
@@ -2226,6 +2251,11 @@ static bool ClientParseArgs(v8::Isolate* isolate, v8::Local<v8::Context> ctx,
 static void ClientBegin(const v8::FunctionCallbackInfo<v8::Value>& args,
                         bool force_get) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_net) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "network access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
@@ -2283,6 +2313,11 @@ static void HttpClientRequest(const v8::FunctionCallbackInfo<v8::Value>& args) {
 // --- fetch(url[, options]) -> Promise<Response> -----------------------------
 static void Nx8vFetch(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_net) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "network access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
@@ -2439,6 +2474,63 @@ inline v8::Local<v8::Object> MakeHttpsModule(v8::Isolate* isolate) {
   obj->Set(ctx, v8::String::NewFromUtf8Literal(isolate, "createServer"),
            v8::Function::New(ctx, HttpsCreateServer).ToLocalChecked()).Check();
   return hs.Escape(obj);
+}
+
+static bool Nx8vWsFrameTooLarge(const std::string& buf) {
+  if (buf.size() < 2) return false;
+  uint64_t len = (uint8_t)buf[1] & 0x7F;
+  if (len == 126) {
+    if (buf.size() < 4) return false;
+    len = ((uint64_t)(uint8_t)buf[2] << 8) | (uint8_t)buf[3];
+  } else if (len == 127) {
+    if (buf.size() < 10) return false;
+    len = 0;
+    for (int i = 0; i < 8; ++i) len = (len << 8) | (uint8_t)buf[2 + i];
+  }
+  return len > (8ull * 1024 * 1024);
+}
+
+inline int Nx8vRunParserFuzz() {
+  int fail = 0;
+  auto http = [&](const std::string& raw, int expect) {
+    std::string method, url, version, body;
+    std::map<std::string, std::string> headers;
+    bool ok = HttpParseRequest(raw, method, url, version, headers, body);
+    int got = ok ? 1 : 0;
+    if (got != expect) ++fail;
+    if (ok && method.empty()) ++fail;
+  };
+  http("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n", 1);
+  http("POST /up HTTP/1.0\r\nContent-Length: 4\r\n\r\nping", 1);
+  http("", 0);
+  http("NOTAREQUEST\r\n\r\n", 0);
+  http(std::string("GET / HTTP/1.1\r\nHost: x\r\n\r\n") + std::string(64, '\0'), 1);
+  http(std::string(2 * 1024 * 1024, 'A'), 0);
+  http("GET / HTTP/1.1\r\nHost: a\r\nContent-Length: 999999999\r\nTransfer-Encoding: chunked\r\n\r\n", 1);
+  std::string huge(200000, 'H');
+  http("GET / HTTP/1.1\r\nX: " + huge + "\r\n\r\n", 1);
+
+  std::string small = std::string("\x81\x05", 2) + "hello";
+  if (Nx8vWsFrameTooLarge(small)) ++fail;
+  std::string claim(10, '\0');
+  claim[0] = 0x82;
+  claim[1] = 127;
+  for (int i = 0; i < 8; ++i) claim[2 + i] = (char)0xFF;
+  if (!Nx8vWsFrameTooLarge(claim)) ++fail;
+  std::string mid(4, '\0');
+  mid[0] = 0x81;
+  mid[1] = 126;
+  mid[2] = 0x00;
+  mid[3] = 0x04;
+  if (Nx8vWsFrameTooLarge(mid)) ++fail;
+  if (Nx8vWsFrameTooLarge("x")) ++fail;
+
+  if (fail) {
+    std::fprintf(stderr, "nx8v --fuzz: %d checks failed\n", fail);
+    return 1;
+  }
+  std::puts("nx8v --fuzz: http and websocket parsers accepted the corpus");
+  return 0;
 }
 
 }} // nx8v::bindings

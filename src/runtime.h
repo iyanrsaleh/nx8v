@@ -61,6 +61,10 @@ struct Runtime {
 
   // console.* appends here when a project.json is found.
   std::string log_path;
+
+  // No --allow-* flag keeps both open. A listed flag closes the other one.
+  bool allow_fs = true;
+  bool allow_net = true;
 };
 
 // Global runtime instance (one per process).

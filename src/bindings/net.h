@@ -241,6 +241,11 @@ static void NetOnClientResolved(uv_getaddrinfo_t* dns, int status, struct addrin
 
 static void NetConnect(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_net) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "network access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   auto ctx = isolate->GetCurrentContext();
   if (args.Length() < 1 || !args[0]->IsNumber()) {
@@ -276,6 +281,11 @@ static void NetConnect(const v8::FunctionCallbackInfo<v8::Value>& args) {
 
 static void NetCreateServer(const v8::FunctionCallbackInfo<v8::Value>& args) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_net) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "network access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   auto ctx = isolate->GetCurrentContext();
   auto* srv = new NetServer();

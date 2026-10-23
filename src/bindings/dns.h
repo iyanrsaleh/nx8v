@@ -86,6 +86,11 @@ static void DnsOnResolved(uv_getaddrinfo_t* req, int status, struct addrinfo* re
 static void DnsStart(const v8::FunctionCallbackInfo<v8::Value>& args,
                      bool lookup, bool v4_only) {
   v8::Isolate* isolate = args.GetIsolate();
+  if (nx8v::g_runtime && !nx8v::g_runtime->allow_net) {
+    isolate->ThrowException(v8::Exception::Error(
+        v8::String::NewFromUtf8Literal(isolate, "network access is not allowed")));
+    return;
+  }
   v8::HandleScope hs(isolate);
   if (args.Length() < 2 || !args[0]->IsString() || !args[1]->IsFunction()) {
     isolate->ThrowException(v8::Exception::TypeError(
