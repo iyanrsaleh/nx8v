@@ -2405,7 +2405,7 @@ static void HttpsCreateServer(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (args.Length() < 1 || !args[0]->IsObject() || args[0]->IsFunction()) {
     isolate->ThrowException(v8::Exception::TypeError(
         v8::String::NewFromUtf8Literal(
-            isolate, "https.createServer membutuhkan { pfx, passphrase } atau { cert, key }")));
+            isolate, "https.createServer requires { pfx, passphrase } or { cert, key }")));
     return;
   }
   auto opts = args[0].As<v8::Object>();
@@ -2426,7 +2426,7 @@ static void HttpsCreateServer(const v8::FunctionCallbackInfo<v8::Value>& args) {
   if (srv->tls_pfx.empty() && (srv->tls_cert.empty() || srv->tls_key.empty())) {
     isolate->ThrowException(v8::Exception::TypeError(
         v8::String::NewFromUtf8Literal(
-            isolate, "https.createServer membutuhkan pfx atau cert dan key")));
+            isolate, "https.createServer requires a pfx, or a cert and a key")));
     return;
   }
   args.GetReturnValue().Set(obj);

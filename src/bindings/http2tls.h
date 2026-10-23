@@ -694,7 +694,7 @@ static bool Nx8vTlsAcquire(Nx8vTlsCred* cred, std::string* err) {
     }
   }
   char buf[96];
-  std::snprintf(buf, sizeof(buf), "AcquireCredentialsHandle gagal (%08lx).",
+  std::snprintf(buf, sizeof(buf), "AcquireCredentialsHandle failed (%08lx).",
                 (unsigned long)st);
   *err = buf;
   return false;
@@ -710,7 +710,7 @@ static BOOL CALLBACK Nx8vResolveProv(CRYPT_PRIVATE_KEY_INFO*, HCRYPTPROV* ph, LP
 
 static bool Nx8vTlsLoadPem(HttpServer* srv, Nx8vTlsCred* cred, std::string* err) {
   if (srv->tls_key.find("BEGIN ENCRYPTED PRIVATE KEY") != std::string::npos) {
-    *err = "kunci terenkripsi belum didukung. Pakai pfx dan passphrase.";
+    *err = "Encrypted private keys are not supported. Use a pfx and a passphrase.";
     return false;
   }
   std::string cert_der = Nx8vPemPart(srv->tls_cert, "-----BEGIN CERTIFICATE-----",
@@ -723,14 +723,14 @@ static bool Nx8vTlsLoadPem(HttpServer* srv, Nx8vTlsCred* cred, std::string* err)
     if (!pkcs1.empty()) key_der = Nx8vPkcs1ToPkcs8(pkcs1);
   }
   if (cert_der.empty() || key_der.empty()) {
-    *err = "sertifikat TLS tidak bisa dibaca. Pakai pfx, atau cert PEM dan key PKCS#8.";
+    *err = "The TLS certificate could not be read. Use a pfx, or a PEM certificate and a PKCS#8 key.";
     return false;
   }
   PCCERT_CONTEXT created = CertCreateCertificateContext(
       X509_ASN_ENCODING | PKCS_7_ASN_ENCODING,
       reinterpret_cast<const BYTE*>(cert_der.data()), (DWORD)cert_der.size());
   if (!created) {
-    *err = "sertifikat PEM tidak valid.";
+    *err = "The PEM certificate is not valid.";
     return false;
   }
   cred->store = CertOpenStore(CERT_STORE_PROV_MEMORY, 0, 0, 0, nullptr);
@@ -738,7 +738,7 @@ static bool Nx8vTlsLoadPem(HttpServer* srv, Nx8vTlsCred* cred, std::string* err)
       !CertAddCertificateContextToStore(cred->store, created, CERT_STORE_ADD_ALWAYS,
                                         &cred->cert)) {
     CertFreeCertificateContext(created);
-    *err = "sertifikat PEM tidak bisa dimasukkan ke penyimpanan.";
+    *err = "The PEM certificate could not be stored.";
     return false;
   }
   CertFreeCertificateContext(created);
@@ -778,7 +778,7 @@ static bool Nx8vTlsLoadPem(HttpServer* srv, Nx8vTlsCred* cred, std::string* err)
   ip.pVoidResolveFunc = &pick;
   HCRYPTPROV hprov = 0;
   if (!CryptImportPKCS8(ip, CRYPT_EXPORTABLE, &hprov, nullptr)) {
-    *err = "kunci privat PEM tidak bisa diimpor. Pakai PKCS#8 atau pfx.";
+    *err = "The PEM private key could not be imported. Use PKCS#8 or a pfx.";
     return false;
   }
   CryptReleaseContext(hprov, 0);
@@ -792,7 +792,7 @@ static bool Nx8vTlsLoadPem(HttpServer* srv, Nx8vTlsCred* cred, std::string* err)
   kpi.dwProvType = PROV_RSA_FULL;
   kpi.dwKeySpec = AT_KEYEXCHANGE;
   if (!CertSetCertificateContextProperty(cred->cert, CERT_KEY_PROV_INFO_PROP_ID, 0, &kpi)) {
-    *err = "kunci privat tidak bisa dipasang pada sertifikat.";
+    *err = "The private key could not be attached to the certificate.";
     return false;
   }
   return true;
@@ -816,7 +816,7 @@ static bool Nx8vTlsPrepare(HttpServer* srv, std::string* err) {
       if (cred->store) break;
     }
     if (!cred->store) {
-      *err = "berkas pfx tidak bisa dibaca. Periksa passphrase.";
+      *err = "The pfx file could not be read. Check the passphrase.";
       Nx8vTlsFree(srv);
       return false;
     }
@@ -824,7 +824,7 @@ static bool Nx8vTlsPrepare(HttpServer* srv, std::string* err) {
         cred->store, X509_ASN_ENCODING | PKCS_7_ASN_ENCODING, 0,
         CERT_FIND_HAS_PRIVATE_KEY, nullptr, nullptr);
     if (!cred->cert) {
-      *err = "berkas pfx tidak berisi kunci privat.";
+      *err = "The pfx file does not contain a private key.";
       Nx8vTlsFree(srv);
       return false;
     }
@@ -961,7 +961,7 @@ static bool Nx8vTlsConsume(HttpConn* conn, const char* data, size_t n) {
       if (st == SEC_E_INCOMPLETE_MESSAGE) return false;
       if (st != SEC_E_OK && st != SEC_I_CONTINUE_NEEDED && st != SEC_I_COMPLETE_NEEDED &&
           st != SEC_I_COMPLETE_AND_CONTINUE) {
-        std::fprintf(stderr, "TLS handshake gagal (%ld)\n", (long)st);
+        std::fprintf(stderr, "TLS handshake failed (%ld)\n", (long)st);
         if (!uv_is_closing((uv_handle_t*)&conn->handle)) {
           uv_close((uv_handle_t*)&conn->handle, [](uv_handle_t* h) {
             delete reinterpret_cast<HttpConn*>(h->data);
@@ -1043,7 +1043,7 @@ static bool Nx8vTlsPrepare(HttpServer* srv, std::string* err) {
   srv->tls_state = cred;
   cred->ctx = SSL_CTX_new(TLS_server_method());
   if (!cred->ctx) {
-    *err = "SSL_CTX_new gagal.";
+    *err = "SSL_CTX_new failed.";
     Nx8vTlsFree(srv);
     return false;
   }
@@ -1057,7 +1057,7 @@ static bool Nx8vTlsPrepare(HttpServer* srv, std::string* err) {
     PKCS12* p12 = d2i_PKCS12(nullptr, &p, (long)srv->tls_pfx.size());
     if (!p12 || !PKCS12_parse(p12, srv->tls_pass.c_str(), &key, &cert, &extra)) {
       if (p12) PKCS12_free(p12);
-      *err = "berkas pfx tidak bisa dibaca. Periksa passphrase.";
+      *err = "The pfx file could not be read. Check the passphrase.";
       Nx8vTlsFree(srv);
       return false;
     }
@@ -1082,8 +1082,8 @@ static bool Nx8vTlsPrepare(HttpServer* srv, std::string* err) {
       if (key) EVP_PKEY_free(key);
       if (extra) sk_X509_pop_free(extra, X509_free);
       *err = srv->tls_key.find("BEGIN ENCRYPTED PRIVATE KEY") != std::string::npos
-                 ? "kunci terenkripsi belum didukung. Pakai pfx dan passphrase."
-                 : "sertifikat TLS tidak bisa dibaca. Pakai pfx, atau cert PEM dan key PKCS#8.";
+                 ? "Encrypted private keys are not supported. Use a pfx and a passphrase."
+                 : "The TLS certificate could not be read. Use a pfx, or a PEM certificate and a PKCS#8 key.";
       Nx8vTlsFree(srv);
       return false;
     }
@@ -1102,7 +1102,7 @@ static bool Nx8vTlsPrepare(HttpServer* srv, std::string* err) {
   EVP_PKEY_free(key);
   if (extra) sk_X509_pop_free(extra, X509_free);
   if (!ok) {
-    *err = "kunci privat tidak cocok dengan sertifikat.";
+    *err = "The private key does not match the certificate.";
     Nx8vTlsFree(srv);
     return false;
   }
@@ -1145,7 +1145,7 @@ static bool Nx8vTlsConsume(HttpConn* conn, const char* data, size_t n) {
       if (err == SSL_ERROR_WANT_READ || err == SSL_ERROR_WANT_WRITE) return false;
       char buf[256];
       ERR_error_string_n(ERR_get_error(), buf, sizeof(buf));
-      std::fprintf(stderr, "TLS handshake gagal (%s)\n", buf);
+      std::fprintf(stderr, "TLS handshake failed (%s)\n", buf);
       if (!uv_is_closing((uv_handle_t*)&conn->handle)) {
         uv_close((uv_handle_t*)&conn->handle, [](uv_handle_t* h) {
           delete reinterpret_cast<HttpConn*>(h->data);
@@ -1187,7 +1187,7 @@ static bool Nx8vTlsConsume(HttpConn* conn, const char* data, size_t n) {
 #else
 
 static bool Nx8vTlsPrepare(HttpServer*, std::string* err) {
-  *err = "TLS server pada build ini belum ditautkan.";
+  *err = "The TLS server is not linked in this build.";
   return false;
 }
 static std::string Nx8vTlsSeal(HttpConn*, const std::string& plain) { return plain; }

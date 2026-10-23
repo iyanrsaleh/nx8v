@@ -194,7 +194,7 @@ static std::string Nx8vLoadPartial(const std::string& spec,
                                    std::vector<std::string>& stack) {
   if (depth > 8) return "<!-- nx8v: partial terlalu dalam -->";
   if (spec.empty() || spec.find(':') != std::string::npos)
-    return "<!-- nx8v: partial tidak valid -->";
+    return "<!-- nx8v: invalid partial -->";
 
   std::string rel = spec;
   while (!rel.empty() && (rel[0] == '/' || rel[0] == '\\')) rel.erase(0, 1);
@@ -202,14 +202,14 @@ static std::string Nx8vLoadPartial(const std::string& spec,
   std::error_code ec;
   fs::path file = fs::absolute(base / rel, ec).lexically_normal();
   if (ec || !Nx8vInsideRoot(file, root))
-    return "<!-- nx8v: partial di luar folder public -->";
+    return "<!-- nx8v: partial is outside the public folder -->";
 
   std::string key = file.generic_string();
   for (const auto& seen : stack) {
     if (seen == key) return "<!-- nx8v: partial berulang " + spec + " -->";
   }
   std::ifstream in(file, std::ios::binary);
-  if (!in) return "<!-- nx8v: partial tidak ditemukan: " + spec + " -->";
+  if (!in) return "<!-- nx8v: partial not found: " + spec + " -->";
   std::string data((std::istreambuf_iterator<char>(in)),
                    std::istreambuf_iterator<char>());
   if (data.size() >= 3 && (unsigned char)data[0] == 0xEF &&

@@ -107,7 +107,7 @@ inline bool PackageCopyTree(const fs::path& from, const fs::path& to,
     fs::create_directories(dest.parent_path(), ec2);
     fs::copy_file(p, dest, fs::copy_options::overwrite_existing, ec2);
     if (!ec2) copied.push_back(rel.string());
-    else skipped.push_back(rel.string() + " (gagal)");
+    else skipped.push_back(rel.string() + " (failed)");
 
     it.increment(ec);
   }
@@ -167,7 +167,7 @@ inline int PackageAppendTree(const fs::path& exe, const fs::path& root, const ch
     if (hout == INVALID_HANDLE_VALUE) Sleep(100);
   }
   if (hout == INVALID_HANDLE_VALUE) {
-    std::printf("  ! berkas exe terkunci (%lu)\n", GetLastError());
+    std::printf("  ! exe file is locked (%lu)\n", GetLastError());
     return -1;
   }
   auto emit = [&](const void* data, size_t n) -> bool {
@@ -184,7 +184,7 @@ inline int PackageAppendTree(const fs::path& exe, const fs::path& root, const ch
 #else
   std::ofstream hout(exe, std::ios::binary | std::ios::app);
   if (!hout) {
-    std::printf("  ! berkas exe tidak bisa dibuka\n");
+    std::printf("  ! exe file could not be opened\n");
     return -1;
   }
   auto emit = [&](const void* data, size_t n) -> bool {
@@ -245,7 +245,7 @@ inline int PackageAppendTree(const fs::path& exe, const fs::path& root, const ch
     in.seekg(0);
     if (sz < 0) { it.increment(ec); continue; }
     if (!write_one(rels, in, (uint64_t)sz)) {
-      std::printf("  ! gagal menulis %s\n", rels.c_str());
+      std::printf("  ! failed to write %s\n", rels.c_str());
       return -1;
     }
     ++count;
@@ -327,7 +327,7 @@ inline bool Nx8vPreparePackedApp() {
   fs::remove_all(dir, ec);
   fs::create_directories(dir, ec);
   if (ec) {
-    std::fprintf(stderr, "nx8v: gagal menyiapkan aplikasi\n");
+    std::fprintf(stderr, "nx8v: failed to prepare the application\n");
     return false;
   }
 
@@ -1756,7 +1756,7 @@ inline int RunPackage(int argc, char* argv[]) {
     JsonFindString(json, "version", version);
     JsonFindNumber(json, "port", port);
   } else {
-    std::printf("Peringatan: project.json tidak ditemukan di %s\n",
+    std::printf("Warning: project.json was not found in %s\n",
                 root.string().c_str());
   }
 
@@ -1771,21 +1771,21 @@ inline int RunPackage(int argc, char* argv[]) {
 
   fs::path target = root / out_dir / app_name;
   if (fs::exists(target, ec)) {
-    std::printf("Menghapus paket lama: %s\n", target.string().c_str());
+    std::printf("Removing the previous package: %s\n", target.string().c_str());
     fs::remove_all(target, ec);
   }
   fs::create_directories(target, ec);
 
-  std::printf("Membuat paket '%s'\n", app_name.c_str());
-  std::printf("  sumber : %s\n", root.string().c_str());
-  std::printf("  tujuan : %s\n", target.string().c_str());
+  std::printf("Building package '%s'\n", app_name.c_str());
+  std::printf("  source : %s\n", root.string().c_str());
+  std::printf("  output : %s\n", target.string().c_str());
 
   // The exe is the app. Raw project files are not placed in the folder.
 #ifdef _WIN32
   wchar_t exe_buf[MAX_PATH];
   DWORD exe_n = GetModuleFileNameW(nullptr, exe_buf, MAX_PATH);
   if (exe_n == 0 || exe_n >= MAX_PATH) {
-    std::printf("Gagal menemukan path nx8v.exe\n");
+    std::printf("Failed to find nx8v.exe\n");
     return 1;
   }
   std::wstring exe_w(exe_buf, exe_n);
@@ -1794,7 +1794,7 @@ inline int RunPackage(int argc, char* argv[]) {
 #else
   std::string exe = PackageExePath();
   if (exe.empty()) {
-    std::printf("Gagal menemukan path nx8v.exe\n");
+    std::printf("Failed to find nx8v.exe\n");
     return 1;
   }
   fs::path exe_src(exe);
@@ -1820,7 +1820,7 @@ inline int RunPackage(int argc, char* argv[]) {
       }
       if (h != INVALID_HANDLE_VALUE) CloseHandle(h);
       if (!ok) {
-        std::printf("Gagal menyalin exe: %s\n", cec.message().c_str());
+        std::printf("Failed to copy the exe: %s\n", cec.message().c_str());
         return 1;
       }
     }
@@ -1828,7 +1828,7 @@ inline int RunPackage(int argc, char* argv[]) {
 #else
   fs::copy_file(exe_src, exe_target, fs::copy_options::overwrite_existing, ec);
   if (ec) {
-    std::printf("Gagal menyalin exe: %s\n", ec.message().c_str());
+    std::printf("Failed to copy the exe: %s\n", ec.message().c_str());
     return 1;
   }
 #endif
@@ -1839,9 +1839,9 @@ inline int RunPackage(int argc, char* argv[]) {
   else if (fs::exists(root / "icon.ico", ec)) icon_file = root / "icon.ico";
   if (!icon_file.empty() && fs::is_regular_file(icon_file, ec)) {
     if (PackageEmbedIcon(exe_target, icon_file))
-      std::printf("  + ikon %s\n", icon_file.filename().string().c_str());
+      std::printf("  + icon %s\n", icon_file.filename().string().c_str());
     else
-      std::printf("  ! ikon gagal ditanam ke exe\n");
+      std::printf("  ! failed to embed the icon in the exe\n");
   }
 #ifdef _WIN32
   PackageSetGuiSubsystem(exe_target);
@@ -1849,10 +1849,10 @@ inline int RunPackage(int argc, char* argv[]) {
 
   int packed = PackageAppendPayload(exe_target, root);
   if (packed < 0) {
-    std::printf("Gagal menaruh aplikasi di dalam exe\n");
+    std::printf("Failed to store the application inside the exe\n");
     return 1;
   }
-  std::printf("  + %d file di dalam exe\n", packed);
+  std::printf("  + %d files inside the exe\n", packed);
 
   // ---- WebView2 loader when the project uses the desktop bridge -----------
   bool uses_window = PackageUsesWindow(root);
@@ -1863,7 +1863,7 @@ inline int RunPackage(int argc, char* argv[]) {
                     fs::copy_options::overwrite_existing, ec);
       if (!ec) std::printf("  + WebView2Loader.dll\n");
     } else {
-      std::printf("  ! WebView2Loader.dll tidak ditemukan di %s\n",
+      std::printf("  ! WebView2Loader.dll was not found in %s\n",
                   loader.string().c_str());
     }
   }
@@ -1929,7 +1929,7 @@ inline int RunPackage(int argc, char* argv[]) {
     nsi << "!insertmacro MUI_PAGE_INSTFILES\r\n";
     nsi << "!insertmacro MUI_UNPAGE_CONFIRM\r\n";
     nsi << "!insertmacro MUI_UNPAGE_INSTFILES\r\n";
-    nsi << "!insertmacro MUI_LANGUAGE \"Indonesian\"\r\n";
+    nsi << "!insertmacro MUI_LANGUAGE \"English\"\r\n";
     nsi << "Section\r\n";
     nsi << "  SetOutPath \"$INSTDIR\"\r\n";
     nsi << "  File /r \"" << PackageNsis(files) << "\\*.*\"\r\n";
@@ -1950,14 +1950,14 @@ inline int RunPackage(int argc, char* argv[]) {
   std::printf("  + %s\n", nsi_path.filename().string().c_str());
   fs::path makensis = PackageFindMakensis();
   if (makensis.empty()) {
-    std::printf("  ! makensis tidak ada, pemasang nx8v yang dipakai\n");
+    std::printf("  ! makensis was not found; using the nx8v installer\n");
   } else {
     std::string cmd = "\"" + makensis.string() + "\" /V2 \"" + nsi_path.string() + "\"";
     int rc = std::system(cmd.c_str());
     if (rc == 0 && fs::exists(setup_path, ec))
       std::printf("  + %s (NSIS)\n", setup_path.filename().string().c_str());
     else
-      std::printf("  ! makensis gagal (kode %d)\n", rc);
+      std::printf("  ! makensis failed (code %d)\n", rc);
   }
 
 #ifdef _WIN32
@@ -1995,7 +1995,7 @@ inline int RunPackage(int argc, char* argv[]) {
     if (setup_files >= 0)
       std::printf("  + %s\n", setup_path.filename().string().c_str());
     else
-      std::printf("  ! pemasang gagal dibuat\n");
+      std::printf("  ! failed to build the installer\n");
   }
 #endif
 
@@ -2019,7 +2019,7 @@ inline int RunPackage(int argc, char* argv[]) {
     fs::path linux_bin = linux_dir / app_name;
     fs::copy_file(linux_rt, linux_bin, fs::copy_options::overwrite_existing, lec);
     if (lec) {
-      std::printf("  ! paket Linux gagal: %s\n", lec.message().c_str());
+      std::printf("  ! Linux package failed: %s\n", lec.message().c_str());
     } else {
       std::vector<std::string> linux_files, linux_skipped;
       PackageCopyTree(root, linux_dir, linux_files, linux_skipped);
@@ -2036,21 +2036,21 @@ inline int RunPackage(int argc, char* argv[]) {
       int tar_rc = std::system(tar_cmd.c_str());
       if (tar_rc == 0 && fs::is_regular_file(linux_archive, lec)) {
         fs::remove_all(linux_dir, lec);
-        std::printf("  + %s  (Linux, %d file)\n",
+        std::printf("  + %s  (Linux, %d files)\n",
                     linux_archive.filename().string().c_str(), (int)linux_files.size());
       } else {
-        std::printf("  ! arsip Linux gagal, folder %s dibiarkan\n", linux_name.c_str());
+        std::printf("  ! Linux archive failed; folder %s was left in place\n", linux_name.c_str());
       }
     }
   } else {
-    std::printf("  ! runtime Linux tidak ada, paket Windows tetap dibuat\n");
+    std::printf("  ! Linux runtime was not found; the Windows package was still built\n");
   }
 
-  std::printf("\nSelesai. %d file di dalam exe\n", packed);
+  std::printf("\nDone. %d files inside the exe\n", packed);
   if (uses_window) {
-    std::printf("\nJalankan:\n  \"%s\"\n", exe_target.string().c_str());
+    std::printf("\nRun:\n  \"%s\"\n", exe_target.string().c_str());
   } else {
-    std::printf("\n\nJalankan:\n  cd \"%s\"\n  start.cmd\n", target.string().c_str());
+    std::printf("\n\nRun:\n  cd \"%s\"\n  start.cmd\n", target.string().c_str());
   }
   return 0;
 }

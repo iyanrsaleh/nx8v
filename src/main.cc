@@ -213,7 +213,7 @@ int main(int argc, char* argv[]) {
     }
     if (arg1 == "run") {
       if (argc < 3) {
-        std::puts("Penggunaan: nx8v run <script.js>");
+        std::puts("Usage: nx8v run <script.js>");
         return 1;
       }
       // Shift so argv[1] is the script, then fall through to normal execution.
@@ -227,33 +227,33 @@ int main(int argc, char* argv[]) {
       // rc == -1 → fall through, argv[1] now points to the project script
     }
     if (arg1 == "--version" || arg1 == "-v") {
-      std::puts("nx8v/0.2.0");
+      std::puts("nx8v/0.2.1");
       return 0;
     }
     if (arg1 == "--help" || arg1 == "-h") {
       std::puts(
-        "nx8v - JavaScript runtime berbasis V8 + libuv\n"
+        "nx8v - JavaScript runtime built on V8 and libuv\n"
         "\n"
-        "Penggunaan:\n"
-        "  nx8v                  REPL interaktif\n"
-        "  nx8v init             wizard pembuatan proyek\n"
-        "  nx8v i <nama>@<versi> pasang modul dari repository di project.json\n"
-        "  nx8v u <nama>@<versi> ganti versi modul yang sudah terpasang\n"
-        "  nx8v p <nama>@<versi> terbitkan modules/<nama> ke repository\n"
-        "  nx8v d <nama>         hapus modul dari dependencies\n"
-        "  nx8v r <nama>         hapus rilis, tag, dan folder modul dari repository\n"
-        "  nx8v dev  [file] [--port=N]   mode development + auto-restart\n"
-        "  nx8v start [file] [--port=N]  jalankan proyek (project.json)\n"
-        "  nx8v stop [--port=N]  hentikan server proyek ini\n"
-        "  nx8v list             daftar server nx8v yang berjalan\n"
-        "  nx8v logs [--lines=N] ekor file nx8v.log proyek ini\n"
-        "  nx8v test [path]      jalankan test (*.test.js)\n"
-        "  nx8v package          buat folder distribusi (dist/)\n"
-        "  nx8v window [file]    jendela desktop (WebView2) untuk proyek\n"
-        "  nx8v run <script.js>  jalankan script (eksplisit)\n"
-        "  nx8v <script.js>      eksekusi file script\n"
-        "  nx8v --version        tampilkan versi\n"
-        "  nx8v --help           tampilkan bantuan ini");
+        "Usage:\n"
+        "  nx8v                  interactive REPL\n"
+        "  nx8v init             project setup wizard\n"
+        "  nx8v i <name>@<version>  install a module from the repository in project.json\n"
+        "  nx8v u <name>@<version>  change the version of an installed module\n"
+        "  nx8v p <name>@<version>  publish modules/<name> to the repository\n"
+        "  nx8v d <name>         remove a module from dependencies\n"
+        "  nx8v r <name>         delete the module release, tag, and folder from the repository\n"
+        "  nx8v dev  [file] [--port=N]   development mode with auto-restart\n"
+        "  nx8v start [file] [--port=N]  run the project (project.json)\n"
+        "  nx8v stop [--port=N]  stop this project's server\n"
+        "  nx8v list             list running nx8v servers\n"
+        "  nx8v logs [--lines=N] tail this project's nx8v.log\n"
+        "  nx8v test [path]      run tests (*.test.js)\n"
+        "  nx8v package          build the distribution folder (dist/)\n"
+        "  nx8v window [file]    desktop window (WebView2) for the project\n"
+        "  nx8v run <script.js>  run a script (explicit)\n"
+        "  nx8v <script.js>      run a script file\n"
+        "  nx8v --version        print the version\n"
+        "  nx8v --help           print this help");
       return 0;
     }
   }
@@ -272,7 +272,7 @@ int main(int argc, char* argv[]) {
     if (window_opts.single_instance) {
       fs::path dir = fs::absolute(fs::current_path(ec), ec).lexically_normal();
       if (!nx8v::bindings::Nx8vTakeWindowInstance(dir.wstring())) {
-        std::puts("nx8v window: jendela sudah terbuka");
+        std::puts("nx8v window: the window is already open");
         return 0;
       }
     }
@@ -359,7 +359,7 @@ int main(int argc, char* argv[]) {
         }
         int safe = nx8v::bindings::Nx8vSafeListenPort(want);
         if (want > 0 && safe != want) {
-          std::printf("port %d diblokir WebView2 (ERR_UNSAFE_PORT). Jendela memakai %d.\n",
+          std::printf("port %d is blocked by WebView2 (ERR_UNSAFE_PORT). The window uses %d.\n",
                       want, safe);
         }
         window_listen_port = safe;
@@ -429,7 +429,7 @@ int main(int argc, char* argv[]) {
           port = nx8v::bindings::Nx8vSafeListenPort(port);
           url = "http://127.0.0.1:" + std::to_string(port) + "/?nx8v=2";
         }
-        std::printf("nx8v window: membuka %s\n", url.c_str());
+        std::printf("nx8v window: opening %s\n", url.c_str());
         exit_code = nx8v::bindings::RunWindow(url, window_title, window_w,
                                              window_h, &loop, window_opts);
       } else {

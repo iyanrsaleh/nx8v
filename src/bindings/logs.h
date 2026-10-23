@@ -29,14 +29,14 @@ inline int RunLogs(int argc, char** argv) {
   std::error_code ec;
   fs::path log = fs::current_path(ec) / "nx8v.log";
   if (!fs::exists(log, ec)) {
-    std::puts("nx8v logs: belum ada nx8v.log di folder ini.");
-    std::puts("Log ditulis saat aplikasi berjalan di folder yang punya project.json.");
+    std::puts("nx8v logs: no nx8v.log in this folder.");
+    std::puts("The log is written while the application runs in a folder that has project.json.");
     return 0;
   }
 
   std::ifstream in(log, std::ios::binary);
   if (!in) {
-    std::puts("nx8v logs: tidak bisa membaca nx8v.log");
+    std::puts("nx8v logs: cannot read nx8v.log");
     return 1;
   }
   std::vector<std::string> lines;
@@ -46,7 +46,7 @@ inline int RunLogs(int argc, char** argv) {
     lines.push_back(line);
   }
   int start = (int)lines.size() > want ? (int)lines.size() - want : 0;
-  std::printf("nx8v logs: %s (%d baris)\n", log.string().c_str(), (int)lines.size());
+  std::printf("nx8v logs: %s (%d lines)\n", log.string().c_str(), (int)lines.size());
   for (int i = start; i < (int)lines.size(); ++i)
     std::puts(lines[i].c_str());
   return 0;

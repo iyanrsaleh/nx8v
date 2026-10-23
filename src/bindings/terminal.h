@@ -259,7 +259,7 @@ static void Nx8vTermConsume(HttpConn* conn) {
         conn->term_wait = false;
         std::string err;
         if (!Nx8vTermStart(conn, cols, rows, &err)) {
-          WsSendFrame(conn, 0x1, err.empty() ? "terminal gagal dibuka" : err);
+          WsSendFrame(conn, 0x1, err.empty() ? "terminal failed to open" : err);
           WsSendFrame(conn, 0x8, "");
           if (!uv_is_closing((uv_handle_t*)&conn->handle)) {
             uv_close((uv_handle_t*)&conn->handle, [](uv_handle_t* h) {
@@ -293,7 +293,7 @@ static bool Nx8vTermStart(HttpConn* conn, int cols, int rows, std::string* err) 
   if (conn->term) return true;
 #ifdef _WIN32
   if (!Nx8vConPty().ok()) {
-    if (err) *err = "ConPTY tidak tersedia. Butuh Windows 10 1809 atau lebih baru.";
+    if (err) *err = "ConPTY is not available. Windows 10 1809 or newer is required.";
     return false;
   }
   if (cols < 2) cols = 80;
@@ -308,7 +308,7 @@ static bool Nx8vTermStart(HttpConn* conn, int cols, int rows, std::string* err) 
     if (t->output) CloseHandle(t->output);
     if (out_write) CloseHandle(out_write);
     delete t;
-    if (err) *err = "Gagal membuat pipe terminal.";
+    if (err) *err = "Failed to create the terminal pipe.";
     return false;
   }
   HRESULT hr = Nx8vConPty().create(
@@ -320,7 +320,7 @@ static bool Nx8vTermStart(HttpConn* conn, int cols, int rows, std::string* err) 
     if (t->input) CloseHandle(t->input);
     if (t->output) CloseHandle(t->output);
     delete t;
-    if (err) *err = "CreatePseudoConsole gagal.";
+    if (err) *err = "CreatePseudoConsole failed.";
     return false;
   }
 
@@ -336,7 +336,7 @@ static bool Nx8vTermStart(HttpConn* conn, int cols, int rows, std::string* err) 
     CloseHandle(t->input);
     CloseHandle(t->output);
     delete t;
-    if (err) *err = "Gagal memasang pseudoconsole.";
+    if (err) *err = "Failed to attach the pseudoconsole.";
     return false;
   }
 
@@ -372,7 +372,7 @@ static bool Nx8vTermStart(HttpConn* conn, int cols, int rows, std::string* err) 
     CloseHandle(t->input);
     CloseHandle(t->output);
     delete t;
-    if (err) *err = "Gagal menjalankan shell.";
+    if (err) *err = "Failed to start the shell.";
     return false;
   }
   CloseHandle(pi.hThread);
@@ -386,7 +386,7 @@ static bool Nx8vTermStart(HttpConn* conn, int cols, int rows, std::string* err) 
     CloseHandle(t->output);
     CloseHandle(t->process);
     delete t;
-    if (err) *err = "Gagal memasang terminal pada loop.";
+    if (err) *err = "Failed to attach the terminal to the loop.";
     return false;
   }
   t->async.data = t;
@@ -406,13 +406,13 @@ static bool Nx8vTermStart(HttpConn* conn, int cols, int rows, std::string* err) 
     }
     uv_async_send(&t->async);
   });
-  std::printf("terminal: shell terbuka\n");
+  std::printf("terminal: shell open\n");
   std::fflush(stdout);
   return true;
 #else
   (void)cols;
   (void)rows;
-  if (err) *err = "Terminal PTY pada versi ini hanya tersedia di Windows.";
+  if (err) *err = "The terminal PTY in this version is available on Windows only.";
   return false;
 #endif
 }

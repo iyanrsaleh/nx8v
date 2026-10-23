@@ -286,9 +286,9 @@ static bool InstallCollectReleaseTags(const std::string& owner, const std::strin
 static void InstallPrintReleaseTags(const std::string& owner, const std::string& repo,
                                     const fs::path& tmp) {
   std::vector<std::string> tags;
-  std::cout << "Rilis yang ada:\n";
+  std::cout << "Existing releases:\n";
   if (!InstallCollectReleaseTags(owner, repo, tmp, tags) || tags.empty()) {
-    std::cout << "  (kosong)\n";
+    std::cout << "  (none)\n";
     return;
   }
   for (const auto& tag : tags) std::cout << "  " << tag << "\n";
@@ -508,11 +508,11 @@ static bool InstallListed(const std::string& json, const std::string& name) {
 }
 
 static int InstallOrUpdate(int argc, char* argv[], bool update) {
-  const char* usage = update ? "Penggunaan: nx8v u <nama>@<versi>"
-                             : "Penggunaan: nx8v i <nama>@<versi>";
+  const char* usage = update ? "Usage: nx8v u <name>@<version>"
+                             : "Usage: nx8v i <name>@<version>";
   if (argc < 3) {
     std::puts(usage);
-    std::puts("  Membaca repository.type dan repository.url di project.json.");
+    std::puts("  Reads repository.type and repository.url in project.json.");
     return 1;
   }
   std::string spec = argv[2];
@@ -524,7 +524,7 @@ static int InstallOrUpdate(int argc, char* argv[], bool update) {
   std::string name = spec.substr(0, at);
   std::string version = spec.substr(at + 1);
   if (!InstallNameOk(name) || !InstallNameOk(version)) {
-    std::puts("Nama dan versi hanya huruf, angka, titik, garis bawah, atau minus.");
+    std::puts("Name and version may contain only letters, digits, dots, underscores, or hyphens.");
     return 1;
   }
 
@@ -533,12 +533,12 @@ static int InstallOrUpdate(int argc, char* argv[], bool update) {
   fs::path manifest = root / "project.json";
   std::string json = ReadManifestFile(manifest);
   if (json.empty()) {
-    std::puts("project.json tidak ada. Jalankan perintah ini di folder proyek.");
+    std::puts("project.json was not found. Run this command in a project folder.");
     return 1;
   }
   std::string repo;
   if (!JsonFindObjectBody(json, "repository", repo)) {
-    std::puts("project.json belum punya repository.");
+    std::puts("project.json has no repository.");
     return 1;
   }
   std::string type;
@@ -547,12 +547,12 @@ static int InstallOrUpdate(int argc, char* argv[], bool update) {
   JsonFindString(repo, "url", url);
   if (type.empty()) type = "git";
   if (type != "git") {
-    std::puts("repository.type yang didukung saat ini: git");
+    std::puts("repository.type currently supported: git");
     return 1;
   }
   if (url.empty()) url = kNx8vDepsRepository;
   if (update && !InstallListed(json, name)) {
-    std::cout << name << " belum ada di dependencies. Pasang dengan nx8v i "
+    std::cout << name << " is not in dependencies. Install it with nx8v i "
               << name << "@" << version << "\n";
     return 1;
   }
@@ -575,47 +575,47 @@ static int InstallOrUpdate(int argc, char* argv[], bool update) {
   fs::path src = tmp / "files";
   if (InstallGithub(url, owner, repo_name)) {
     resolved = "https://github.com/" + owner + "/" + repo_name + "/releases/tag/" + tag;
-    std::cout << "mengambil " << name << "@" << version << " dari " << resolved << std::endl;
+    std::cout << "fetching " << name << "@" << version << " from " << resolved << std::endl;
     if (!InstallGithubRelease(owner, repo_name, tag, src)) {
-      std::cout << "rilis " << tag << " tidak ada, atau tidak memuat index.js\n";
+      std::cout << "release " << tag << " was not found, or it has no index.js\n";
       std::cout << resolved << "\n";
       InstallPrintReleaseTags(owner, repo_name, tmp);
       return 1;
     }
   } else {
-    std::cout << "mengambil " << name << "@" << version << " dari " << url << std::endl;
+    std::cout << "fetching " << name << "@" << version << " from " << url << std::endl;
     int rc = InstallExec("git", {"clone", "--depth", "1", "--branch", tag, url, src.string()});
     if (rc == -1) {
-      std::puts("git tidak ditemukan. Pasang Git, lalu ulangi perintahnya.");
+      std::puts("git was not found. Install Git, then run the command again.");
       return 1;
     }
     if (rc != 0 || !fs::is_regular_file(src / "index.js", ec)) {
-      std::cout << "tag " << tag << " tidak memuat index.js\n";
+      std::cout << "tag " << tag << " has no index.js\n";
       return 1;
     }
   }
   fs::path dest = root / "modules" / name;
   fs::remove_all(dest, ec);
   if (!InstallCopyTree(src, dest)) {
-    std::puts("gagal menyalin modul ke modules/.");
+    std::puts("failed to copy the module into modules/.");
     return 1;
   }
   if (!InstallUpsertDep(json, name, version)) {
-    std::puts("gagal menulis dependencies di project.json.");
+    std::puts("failed to write dependencies in project.json.");
     return 1;
   }
   std::ofstream out(manifest, std::ios::binary | std::ios::trunc);
   if (!out) {
-    std::puts("gagal menyimpan project.json.");
+    std::puts("failed to save project.json.");
     return 1;
   }
   out << json;
   out.close();
   if (!InstallWriteLock(root / "nx8v.lock", name, version, resolved)) {
-    std::puts("gagal menulis nx8v.lock.");
+    std::puts("failed to write nx8v.lock.");
     return 1;
   }
-  std::cout << (update ? "diperbarui " : "terpasang ")
+  std::cout << (update ? "updated " : "installed ")
             << name << "@" << version << " -> modules/" << name << "\n";
   return 0;
 }
@@ -626,12 +626,12 @@ inline int RunUpdate(int argc, char* argv[]) { return InstallOrUpdate(argc, argv
 
 inline int RunRemove(int argc, char* argv[]) {
   if (argc < 3 || std::string(argv[2]).find('@') != std::string::npos) {
-    std::puts("Penggunaan: nx8v d <nama>");
+    std::puts("Usage: nx8v d <name>");
     return 1;
   }
   std::string name = argv[2];
   if (!InstallNameOk(name)) {
-    std::puts("Nama hanya huruf, angka, titik, garis bawah, atau minus.");
+    std::puts("Name may contain only letters, digits, dots, underscores, or hyphens.");
     return 1;
   }
   std::error_code ec;
@@ -639,20 +639,20 @@ inline int RunRemove(int argc, char* argv[]) {
   fs::path manifest = root / "project.json";
   std::string json = ReadManifestFile(manifest);
   if (json.empty()) {
-    std::puts("project.json tidak ada. Jalankan perintah ini di folder proyek.");
+    std::puts("project.json was not found. Run this command in a project folder.");
     return 1;
   }
   if (!InstallListed(json, name)) {
-    std::cout << name << " tidak ada di dependencies.\n";
+    std::cout << name << " is not in dependencies.\n";
     return 1;
   }
   if (!InstallDropDep(json, name)) {
-    std::puts("gagal menghapus dependencies di project.json.");
+    std::puts("failed to remove the dependency from project.json.");
     return 1;
   }
   std::ofstream out(manifest, std::ios::binary | std::ios::trunc);
   if (!out) {
-    std::puts("gagal menyimpan project.json.");
+    std::puts("failed to save project.json.");
     return 1;
   }
   out << json;
@@ -665,26 +665,26 @@ inline int RunRemove(int argc, char* argv[]) {
     if (lout) lout << lock_json;
   }
   fs::remove_all(root / "modules" / name, ec);
-  std::cout << "dihapus " << name << " dari dependencies\n";
+  std::cout << "removed " << name << " from dependencies\n";
   return 0;
 }
 
 inline int RunPublish(int argc, char* argv[]) {
   if (argc < 3) {
-    std::puts("Penggunaan: nx8v p <nama>@<versi>");
-    std::puts("  Menerbitkan berkas di modules/<nama> ke repository di project.json.");
+    std::puts("Usage: nx8v p <name>@<version>");
+    std::puts("  Publishes the files in modules/<name> to the repository in project.json.");
     return 1;
   }
   std::string spec = argv[2];
   auto at = spec.rfind('@');
   if (at == std::string::npos || at == 0 || at + 1 >= spec.size()) {
-    std::puts("Penggunaan: nx8v p <nama>@<versi>");
+    std::puts("Usage: nx8v p <name>@<version>");
     return 1;
   }
   std::string name = spec.substr(0, at);
   std::string version = spec.substr(at + 1);
   if (!InstallNameOk(name) || !InstallNameOk(version)) {
-    std::puts("Nama dan versi hanya huruf, angka, titik, garis bawah, atau minus.");
+    std::puts("Name and version may contain only letters, digits, dots, underscores, or hyphens.");
     return 1;
   }
 
@@ -692,18 +692,18 @@ inline int RunPublish(int argc, char* argv[]) {
   fs::path root = fs::current_path(ec);
   fs::path mod = root / "modules" / name;
   if (!fs::is_regular_file(mod / "index.js", ec)) {
-    std::cout << "modules/" << name << "/index.js tidak ada.\n";
+    std::cout << "modules/" << name << "/index.js was not found.\n";
     return 1;
   }
   fs::path manifest = root / "project.json";
   std::string json = ReadManifestFile(manifest);
   if (json.empty()) {
-    std::puts("project.json tidak ada. Jalankan perintah ini di folder proyek.");
+    std::puts("project.json was not found. Run this command in a project folder.");
     return 1;
   }
   std::string repo;
   if (!JsonFindObjectBody(json, "repository", repo)) {
-    std::puts("project.json belum punya repository.");
+    std::puts("project.json has no repository.");
     return 1;
   }
   std::string type;
@@ -712,14 +712,14 @@ inline int RunPublish(int argc, char* argv[]) {
   JsonFindString(repo, "url", url);
   if (type.empty()) type = "git";
   if (type != "git") {
-    std::puts("repository.type yang didukung saat ini: git");
+    std::puts("repository.type currently supported: git");
     return 1;
   }
   if (url.empty()) url = kNx8vDepsRepository;
   std::string owner;
   std::string repo_name;
   if (!InstallGithub(url, owner, repo_name)) {
-    std::puts("repository.url harus repo GitHub untuk menerbitkan rilis.");
+    std::puts("repository.url must be a GitHub repository to publish a release.");
     return 1;
   }
 
@@ -731,7 +731,7 @@ inline int RunPublish(int argc, char* argv[]) {
     files.push_back(it->path().string());
   }
   if (files.empty()) {
-    std::cout << "modules/" << name << " tidak berisi berkas.\n";
+    std::cout << "modules/" << name << " contains no files.\n";
     return 1;
   }
 
@@ -741,56 +741,56 @@ inline int RunPublish(int argc, char* argv[]) {
   const char* gh = "gh";
 #endif
   if (InstallExec(gh, {"api", "user", "--silent"}) != 0) {
-    std::puts("gh belum masuk. Jalankan: gh auth login");
+    std::puts("gh is not logged in. Run: gh auth login");
     return 1;
   }
 
   std::string tag = name + "-" + version;
   std::string resolved = "https://github.com/" + owner + "/" + repo_name + "/releases/tag/" + tag;
-  std::cout << "menerbitkan " << name << "@" << version << " ke " << resolved << std::endl;
+  std::cout << "publishing " << name << "@" << version << " to " << resolved << std::endl;
   std::vector<std::string> args = {
       "release", "create", tag,
       "--repo", owner + "/" + repo_name,
       "--title", name + " " + version,
-      "--notes", "Modul NX8V " + name + " v" + version};
+      "--notes", "NX8V module " + name + " v" + version};
   args.insert(args.end(), files.begin(), files.end());
   int rc = InstallExec(gh, args);
   if (rc == -1) {
-    std::puts("gh tidak ditemukan. Pasang GitHub CLI, lalu ulangi perintahnya.");
+    std::puts("gh was not found. Install GitHub CLI, then run the command again.");
     return 1;
   }
   if (rc != 0) {
-    std::cout << "gagal menerbitkan rilis " << tag << "\n";
+    std::cout << "failed to publish release " << tag << "\n";
     return 1;
   }
   if (!InstallUpsertDep(json, name, version)) {
-    std::puts("rilis terbit, tetapi dependencies di project.json gagal ditulis.");
+    std::puts("the release was published, but dependencies in project.json were not written.");
     return 1;
   }
   std::ofstream out(manifest, std::ios::binary | std::ios::trunc);
   if (!out) {
-    std::puts("rilis terbit, tetapi project.json gagal disimpan.");
+    std::puts("the release was published, but project.json was not saved.");
     return 1;
   }
   out << json;
   out.close();
   if (!InstallWriteLock(root / "nx8v.lock", name, version, resolved)) {
-    std::puts("rilis terbit, tetapi nx8v.lock gagal ditulis.");
+    std::puts("the release was published, but nx8v.lock was not written.");
     return 1;
   }
-  std::cout << "terbit " << name << "@" << version << "\n";
+  std::cout << "published " << name << "@" << version << "\n";
   return 0;
 }
 
 inline int RunRepoRemove(int argc, char* argv[]) {
   if (argc < 3 || std::string(argv[2]).find('@') != std::string::npos) {
-    std::puts("Penggunaan: nx8v r <nama>");
-    std::puts("  Menghapus rilis, tag, dan folder modul dari repository di project.json.");
+    std::puts("Usage: nx8v r <name>");
+    std::puts("  Deletes the module release, tag, and folder from the repository in project.json.");
     return 1;
   }
   std::string name = argv[2];
   if (!InstallNameOk(name)) {
-    std::puts("Nama hanya huruf, angka, titik, garis bawah, atau minus.");
+    std::puts("Name may contain only letters, digits, dots, underscores, or hyphens.");
     return 1;
   }
 
@@ -798,12 +798,12 @@ inline int RunRepoRemove(int argc, char* argv[]) {
   fs::path root = fs::current_path(ec);
   std::string json = ReadManifestFile(root / "project.json");
   if (json.empty()) {
-    std::puts("project.json tidak ada. Jalankan perintah ini di folder proyek.");
+    std::puts("project.json was not found. Run this command in a project folder.");
     return 1;
   }
   std::string repo;
   if (!JsonFindObjectBody(json, "repository", repo)) {
-    std::puts("project.json belum punya repository.");
+    std::puts("project.json has no repository.");
     return 1;
   }
   std::string type;
@@ -812,14 +812,14 @@ inline int RunRepoRemove(int argc, char* argv[]) {
   JsonFindString(repo, "url", url);
   if (type.empty()) type = "git";
   if (type != "git") {
-    std::puts("repository.type yang didukung saat ini: git");
+    std::puts("repository.type currently supported: git");
     return 1;
   }
   if (url.empty()) url = kNx8vDepsRepository;
   std::string owner;
   std::string repo_name;
   if (!InstallGithub(url, owner, repo_name)) {
-    std::puts("repository.url harus repo GitHub untuk menghapus rilis.");
+    std::puts("repository.url must be a GitHub repository to delete a release.");
     return 1;
   }
 
@@ -829,7 +829,7 @@ inline int RunRepoRemove(int argc, char* argv[]) {
   const char* gh = "gh";
 #endif
   if (InstallExec(gh, {"api", "user", "--silent"}) != 0) {
-    std::puts("gh belum masuk. Jalankan: gh auth login");
+    std::puts("gh is not logged in. Run: gh auth login");
     return 1;
   }
 
@@ -846,11 +846,11 @@ inline int RunRepoRemove(int argc, char* argv[]) {
   fs::create_directories(tmp, ec);
 
   std::string repo_slug = owner + "/" + repo_name;
-  std::cout << "menghapus " << name << " dari https://github.com/" << repo_slug << std::endl;
+  std::cout << "removing " << name << " from https://github.com/" << repo_slug << std::endl;
 
   std::vector<std::string> tags;
   if (!InstallCollectReleaseTags(owner, repo_name, tmp, tags)) {
-    std::puts("gagal membaca daftar rilis.");
+    std::puts("failed to read the release list.");
     return 1;
   }
   std::string prefix = name + "-";
@@ -861,54 +861,54 @@ inline int RunRepoRemove(int argc, char* argv[]) {
     int rc = InstallExec(gh, {"release", "delete", tag, "--repo", repo_slug,
                               "--yes", "--cleanup-tag"});
     if (rc == -1) {
-      std::puts("gh tidak ditemukan. Pasang GitHub CLI, lalu ulangi perintahnya.");
+      std::puts("gh was not found. Install GitHub CLI, then run the command again.");
       return 1;
     }
     if (rc != 0) {
-      std::cout << "gagal menghapus rilis " << tag << "\n";
+      std::cout << "failed to delete release " << tag << "\n";
       return 1;
     }
-    std::cout << "rilis " << tag << " dihapus\n";
+    std::cout << "deleted release " << tag << "\n";
     removed = true;
   }
 
   fs::path src = tmp / "repo";
   int clone_rc = InstallExec("git", {"clone", "--depth", "1", url, src.string()});
   if (clone_rc == -1) {
-    std::puts("git tidak ditemukan. Pasang Git, lalu ulangi perintahnya.");
+    std::puts("git was not found. Install Git, then run the command again.");
     return 1;
   }
   if (clone_rc != 0) {
-    std::puts("gagal menyalin repository.");
+    std::puts("failed to clone the repository.");
     return 1;
   }
   if (fs::is_directory(src / name, ec)) {
     int rm_rc = InstallExec("git", {"-C", src.string(), "rm", "-r", "--", name});
     if (rm_rc != 0) {
-      std::cout << "gagal menghapus folder " << name << "\n";
+      std::cout << "failed to delete folder " << name << "\n";
       return 1;
     }
     int commit_rc = InstallExec("git", {"-C", src.string(), "commit", "-m",
-                                        "Hapus modul " + name + " dari repository."});
+                                        "Remove " + name + " from the repository."});
     if (commit_rc != 0) {
-      std::puts("gagal menyimpan penghapusan folder di repository.");
+      std::puts("failed to commit the folder removal in the repository.");
       return 1;
     }
     int push_rc = InstallExec("git", {"-C", src.string(), "push", "origin", "HEAD"});
     if (push_rc != 0) {
-      std::puts("gagal mendorong penghapusan folder ke repository.");
+      std::puts("failed to push the folder removal to the repository.");
       return 1;
     }
-    std::cout << "folder " << name << " dihapus\n";
+    std::cout << "deleted folder " << name << "\n";
     removed = true;
   }
 
   if (!removed) {
-    std::cout << name << " tidak ada di repository\n";
+    std::cout << name << " was not found in the repository\n";
     InstallPrintReleaseTags(owner, repo_name, tmp);
     return 1;
   }
-  std::cout << "dihapus " << name << " dari repository\n";
+  std::cout << "removed " << name << " from the repository\n";
   return 0;
 }
 

@@ -1194,8 +1194,8 @@ static void Nx8vSetupWebView(WindowState* st) {
   auto on_env = Callback<ICoreWebView2CreateCoreWebView2EnvironmentCompletedHandler>(
       [st](HRESULT result, ICoreWebView2Environment* env) -> HRESULT {
         if (FAILED(result) || !env) {
-          std::fprintf(stderr, "nx8v window: gagal membuat WebView2 environment "
-                               "(0x%08lX). Pastikan WebView2 Runtime terpasang.\n",
+          std::fprintf(stderr, "nx8v window: failed to create the WebView2 environment "
+                               "(0x%08lX). Install the WebView2 Runtime.\n",
                        (unsigned long)result);
           PostQuitMessage(1);
           return S_OK;
@@ -1206,7 +1206,7 @@ static void Nx8vSetupWebView(WindowState* st) {
             Callback<ICoreWebView2CreateCoreWebView2ControllerCompletedHandler>(
                 [st](HRESULT res2, ICoreWebView2Controller* controller) -> HRESULT {
                   if (FAILED(res2) || !controller) {
-                    std::fprintf(stderr, "nx8v window: gagal membuat controller "
+                    std::fprintf(stderr, "nx8v window: failed to create the controller "
                                          "(0x%08lX)\n", (unsigned long)res2);
                     PostQuitMessage(1);
                     return S_OK;
@@ -1469,14 +1469,14 @@ static void Nx8vReloadViews() {
   };
   reload(g_window);
   for (WindowState* extra : g_extra) reload(extra);
-  std::printf("[window] memuat ulang halaman\n");
+  std::printf("[window] reloading the page\n");
   std::fflush(stdout);
 }
 
 static void Nx8vRelaunchWindow() {
   if (g_winwatch.relaunching) return;
   g_winwatch.relaunching = true;
-  std::printf("[window] server berubah, membuka ulang jendela\n");
+  std::printf("[window] server changed, reopening the window\n");
   std::fflush(stdout);
   SetEnvironmentVariableW(L"NX8V_WINDOW_RELAUNCH", L"1");
   std::wstring cmd = GetCommandLineW();
@@ -1487,7 +1487,7 @@ static void Nx8vRelaunchWindow() {
   PROCESS_INFORMATION pi{};
   if (!CreateProcessW(nullptr, buf.data(), nullptr, nullptr, FALSE, 0,
                       nullptr, nullptr, &si, &pi)) {
-    std::fprintf(stderr, "[window] gagal membuka ulang jendela\n");
+    std::fprintf(stderr, "[window] failed to reopen the window\n");
     g_winwatch.relaunching = false;
     return;
   }
@@ -1749,7 +1749,7 @@ inline int RunWindow(const std::string& url, const std::string& title,
                             pos_x, pos_y, width, height,
                             nullptr, nullptr, hinst, &st);
   if (!st.hwnd) {
-    std::fprintf(stderr, "nx8v window: CreateWindowEx gagal (%lu)\n",
+    std::fprintf(stderr, "nx8v window: CreateWindowEx failed (%lu)\n",
                  (unsigned long)GetLastError());
     return 1;
   }
@@ -1811,7 +1811,7 @@ namespace nx8v {
 namespace bindings {
 inline int RunWindow(const std::string&, const std::string&, int, int, uv_loop_t*,
                      const Nx8vWindowOpts& = {}) {
-  std::fprintf(stderr, "nx8v window hanya didukung di Windows\n");
+  std::fprintf(stderr, "nx8v window is supported on Windows only\n");
   return 1;
 }
 }} // nx8v::bindings

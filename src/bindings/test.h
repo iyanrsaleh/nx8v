@@ -299,7 +299,7 @@ inline int RunTestFiles(v8::Isolate* isolate, const std::vector<fs::path>& files
 
     std::string source = ReadFile(file.string().c_str());
     if (source.empty()) {
-      std::printf("  ! tidak bisa membaca %s\n", file.string().c_str());
+      std::printf("  ! cannot read %s\n", file.string().c_str());
       ++total_fail;
       failures.push_back(file.string() + ": unreadable");
       continue;
@@ -381,9 +381,9 @@ inline int RunTestFiles(v8::Isolate* isolate, const std::vector<fs::path>& files
   g_test_registry = nullptr;
 
   std::printf("\n----------------------------------------\n");
-  std::printf("%d lulus, %d gagal\n", total_pass, total_fail);
+  std::printf("%d passed, %d failed\n", total_pass, total_fail);
   if (!failures.empty()) {
-    std::printf("\nGagal:\n");
+    std::printf("\nFailed:\n");
     for (auto& f : failures) std::printf("  - %s\n", f.c_str());
   }
   return total_fail == 0 ? 0 : 1;
@@ -398,12 +398,12 @@ inline int RunTest(v8::Isolate* isolate, int argc, char* argv[]) {
 
   auto files = TestDiscover(root);
   if (files.empty()) {
-    std::printf("Tidak ada file test ditemukan di '%s'\n", root.string().c_str());
-    std::printf("Buat file *.test.js atau folder test/ berisi *.js\n");
+    std::printf("No test file found in '%s'\n", root.string().c_str());
+    std::printf("Add a *.test.js file, or a test/ folder containing *.js\n");
     return 1;
   }
 
-  std::printf("Menjalankan %d file test\n", (int)files.size());
+  std::printf("Running %d test file(s)\n", (int)files.size());
   return RunTestFiles(isolate, files);
 }
 

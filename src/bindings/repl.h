@@ -17,7 +17,7 @@ inline void RunRepl(v8::Isolate* isolate) {
   v8::Local<v8::Context> ctx = isolate->GetCurrentContext();
 
   std::cout << "NX8V JavaScript Runtime  (Ctrl+C or .exit to quit)\n";
-  std::cout << "Version: nx8v/0.2.0\n\n";
+  std::cout << "Version: nx8v/0.2.1\n\n";
 
   std::string line;
   for (;;) {

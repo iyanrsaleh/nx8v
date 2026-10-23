@@ -218,7 +218,7 @@ inline int RunList(int argc, char* argv[]) {
 
   auto servers = ListRunningServers();
   if (servers.empty()) {
-    std::printf("Tidak ada server nx8v yang sedang berjalan.\n");
+    std::printf("No nx8v server is running.\n");
     return 0;
   }
 
@@ -230,7 +230,7 @@ inline int RunList(int argc, char* argv[]) {
                 s.project.empty() ? "(unknown)" : s.project.c_str(),
                 s.dir.empty() ? "(unknown)" : s.dir.c_str());
   }
-  std::printf("\nHentikan dengan: nx8v stop --port=<PORT>\n");
+  std::printf("\nStop one with: nx8v stop --port=<PORT>\n");
   return 0;
 }
 

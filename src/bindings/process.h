@@ -88,7 +88,7 @@ inline v8::Local<v8::Object> MakeProcessObject(v8::Isolate* isolate,
   // --- process.version ---
   obj->Set(ctx,
     v8::String::NewFromUtf8Literal(isolate, "version"),
-    v8::String::NewFromUtf8Literal(isolate, "nx8v/0.2.0")).Check();
+    v8::String::NewFromUtf8Literal(isolate, "nx8v/0.2.1")).Check();
   // --- process.platform ---
 #ifdef _WIN32
   const char* platform_str = "win32";
