@@ -1,0 +1,56 @@
+# Hasil kompilasi dan cache
+/build/
+/out/
+/deps/
+/.nx8v/
+/.nxcode/
+
+# Dokumentasi dan contoh ada di D:\Website\nx8v
+/README.md
+/desktop.md
+/server.md
+/BUILD.md
+/example/
+/samples/
+/linux/
+/packaging/
+
+
+# Paket distribusi
+/dist/
+**/dist/
+
+# Ketergantungan yang diunduh
+node_modules/
+
+# Berkas runtime lokal
+*.log
+nx8v.lock
+.nx8v-pid
+
+# Binary dan sisa linker
+*.exe
+*.dll
+*.obj
+*.o
+*.pdb
+*.ilk
+*.idb
+*.exp
+*.lib
+*.a
+nx8v-linux
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+cmake-build-*/
+
+# Rahasia
+.env
+.env.*
+*.pem
+credentials.json
+
+# Editor
+.vscode/
