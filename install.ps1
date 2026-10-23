@@ -31,8 +31,16 @@ if ($PSScriptRoot) {
   if (Test-Path $candidate) { $local = $candidate }
 }
 
+function Copy-Nx8vLoader($fromDir) {
+  $loader = Join-Path $fromDir "WebView2Loader.dll"
+  if (Test-Path $loader) {
+    Copy-Item $loader (Join-Path $destDir "WebView2Loader.dll") -Force
+  }
+}
+
 if ($local) {
   Copy-Item $local $dest -Force
+  Copy-Nx8vLoader (Split-Path $local -Parent)
   $linuxSrc = Join-Path $PSScriptRoot "build\linux\nx8v"
   if (Test-Path $linuxSrc) {
     Copy-Item $linuxSrc (Join-Path $destDir "nx8v-linux") -Force
@@ -46,6 +54,7 @@ if ($local) {
   $exe = Get-ChildItem $unpack -Filter nx8v.exe -Recurse | Select-Object -First 1
   if (-not $exe) { Write-Error "nx8v.exe tidak ada di arsip rilis." }
   Copy-Item $exe.FullName $dest -Force
+  Copy-Nx8vLoader $exe.DirectoryName
 }
 
 # tambahkan ke PATH user bila belum ada
